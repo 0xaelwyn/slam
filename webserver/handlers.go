@@ -18,7 +18,9 @@ func (ws *webserver) healthHandler(c *gin.Context) {
 func (ws *webserver) readyHandler(c *gin.Context) {
 	_, err := ws.Slack.AuthTest()
 	if err != nil {
+		slackAuthFailures.Inc()
 		c.JSON(400, gin.H{"error": err.Error()})
+		return
 	}
 	c.String(http.StatusOK, "OK")
 }
@@ -75,6 +77,7 @@ func (ws *webserver) handleWebhook(c *gin.Context) error {
 	if msg.Status == "firing" {
 		// do not send alert if already sent
 		if timestamp != "" && channelID != "" {
+			msgDeduplicated.WithLabelValues(channelName).Inc()
 			_, err := c.Writer.WriteString("ok")
 			if err != nil {
 				return err
@@ -99,7 +102,7 @@ func (ws *webserver) handleWebhook(c *gin.Context) error {
 
 		log.Debugf("Alert key '%s' sent", key)
 
-		msgSent.WithLabelValues(channelName).Inc()
+		msgSent.WithLabelValues(channelName, msg.Status).Inc()
 
 		data := map[string]string{
 			"status":    msg.Status,
@@ -125,8 +128,8 @@ func (ws *webserver) handleWebhook(c *gin.Context) error {
 			// update color of original message
 			_, _, err = ws.sendSlackMessage(
 				channelID,
-				msg.CommonAnnotations["summary"],
-				msg.CommonAnnotations["title_link"],
+				msg.CommonAnnotations[ws.TemplateTitleAnnotation],
+				msg.CommonAnnotations[ws.TemplateTitleLinkAnnotation],
 				renderedStr,
 				fmt.Sprintf("Resolved at %s", timeNowToDateTimeFormatted()),
 				color,
@@ -138,7 +141,7 @@ func (ws *webserver) handleWebhook(c *gin.Context) error {
 				return err
 			}
 
-			msgSent.WithLabelValues(channelName).Inc()
+			msgSent.WithLabelValues(channelName, msg.Status).Inc()
 
 			// remove key from cache
 			if ws.Cache == "local" {
@@ -154,10 +157,11 @@ func (ws *webserver) handleWebhook(c *gin.Context) error {
 
 		} else {
 			log.Infof("Key '%s' not found in cache, couldn't update original message.", key)
+			msgResolvedNoCache.WithLabelValues(channelName).Inc()
 			_, _, err = ws.sendSlackMessage(
 				channelName,
-				msg.CommonAnnotations["summary"],
-				msg.CommonAnnotations["title_link"],
+				msg.CommonAnnotations[ws.TemplateTitleAnnotation],
+				msg.CommonAnnotations[ws.TemplateTitleLinkAnnotation],
 				renderedStr,
 				fmt.Sprintf("Resolved at %s", timeNowToDateTimeFormatted()),
 				color,
@@ -168,7 +172,7 @@ func (ws *webserver) handleWebhook(c *gin.Context) error {
 				msgFailedSent.WithLabelValues(channelName).Inc()
 				return err
 			}
-			msgSent.WithLabelValues(channelName).Inc()
+			msgSent.WithLabelValues(channelName, msg.Status).Inc()
 		}
 	}
 	_, err = c.Writer.WriteString("ok")
