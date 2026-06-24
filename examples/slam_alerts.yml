@@ -1,0 +1,54 @@
+groups:
+  - name: slam
+    rules:
+      - alert: SlamDown
+        expr: absent(up{job="slam"})
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "slam is not being scraped"
+          description: "No metrics from slam for more than 1 minute."
+
+      - alert: SlamSlackAuthFailures
+        expr: increase(slam_slack_auth_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "slam Slack auth failures detected"
+          description: "{{ $value }} Slack auth failure(s) in the last 5 minutes. slam readiness is degraded."
+
+      - alert: SlamHighMessageFailureRate
+        expr: |
+          rate(slam_message_sent_failed_total[5m])
+          /
+          (rate(slam_message_sent_total[5m]) + rate(slam_message_sent_failed_total[5m]))
+          > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "slam message failure rate above 10%"
+          description: "Channel {{ $labels.channel }} has a {{ $value | humanizePercentage }} message failure rate over the last 5 minutes."
+
+      - alert: SlamHighResolvedNoCacheRate
+        expr: rate(slam_message_resolved_no_cache_total[15m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "slam resolved alerts frequently missing cache entries"
+          description: "Channel {{ $labels.channel }} is receiving resolved alerts with no cached original message at {{ $value | humanize }} /s. This may indicate cache eviction or a cache backend issue."
+
+      - alert: SlamNoMessagesSent
+        expr: |
+          sum(rate(slam_message_sent_total[30m])) == 0
+          and on()
+          sum(rate(slam_message_deduplicated_total[30m])) == 0
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "slam has sent no messages in 30 minutes"
+          description: "No firing or resolved alerts have been forwarded to Slack in the last 30 minutes."
