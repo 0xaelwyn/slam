@@ -30,6 +30,7 @@ func main() {
 
 	templateTitleAnnotation := flag.String("template.annotation.title", "summary", "Annotation key name to get for setting slack title message")
 	templateTitleLinkAnnotation := flag.String("template.annotation.title-link", "title_link", "Annotation key name to get for setting slack title link message")
+	resolvedTimezone := flag.String("resolved-timezone", "UTC", "Timezone for resolved alert timestamps (e.g. Europe/Paris)")
 
 	redisDB := flag.Int("cache.redis.db", 0, "Redis DB")
 	redisHost := flag.String("cache.redis.host", "localhost:6379", "Redis host")
@@ -85,6 +86,7 @@ func main() {
 		log.Debugf("Using '%s' in '%s' slack workspace (%s)", authResult.User, authResult.Team, authResult.URL)
 	}
 
+	webserver.SetTimezone(*resolvedTimezone)
 	ws := webserver.New(slackClient, *cache, *templateTitleAnnotation, *templateTitleLinkAnnotation, *slackMsgLengthLimit)
 
 	listenAddr := fmt.Sprintf("%s:%d", *serverListenAddress, *serverListenPort)

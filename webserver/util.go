@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+var resolvedTimezone = "UTC"
+
+// SetTimezone sets the timezone used in resolved alert timestamps.
+func SetTimezone(tz string) {
+	resolvedTimezone = tz
+}
+
 // Hash returns the sha256 for  string
 func Hash(key string) string {
 	h := sha256.New()
@@ -16,7 +23,9 @@ func Hash(key string) string {
 }
 
 func timeNowToDateTimeFormatted() string {
-	loc, _ := time.LoadLocation("Europe/Paris")
-	current_time := time.Now().In(loc)
-	return current_time.Format("Jan 2, 2006 at 3:04 PM")
+	loc, err := time.LoadLocation(resolvedTimezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	return time.Now().In(loc).Format("Jan 2, 2006 at 3:04 PM")
 }

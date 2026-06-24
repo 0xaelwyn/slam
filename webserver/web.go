@@ -34,7 +34,33 @@ var (
 			Name:      "message_sent_total",
 			Help:      "The total number of successfully messages sent.",
 		},
+		[]string{"channel", "status"},
+	)
+
+	msgDeduplicated = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: "slam",
+			Name:      "message_deduplicated_total",
+			Help:      "The total number of firing alerts skipped because already sent.",
+		},
 		[]string{"channel"},
+	)
+
+	msgResolvedNoCache = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: "slam",
+			Name:      "message_resolved_no_cache_total",
+			Help:      "The total number of resolved alerts with no original message in cache.",
+		},
+		[]string{"channel"},
+	)
+
+	slackAuthFailures = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Subsystem: "slam",
+			Name:      "slack_auth_failures_total",
+			Help:      "The total number of Slack auth check failures.",
+		},
 	)
 
 	localCache    *memcache.MemCache
@@ -43,7 +69,7 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(msgFailedSent, msgSent)
+	prometheus.MustRegister(msgFailedSent, msgSent, msgDeduplicated, msgResolvedNoCache, slackAuthFailures)
 }
 
 type webserver struct {
